@@ -4,6 +4,9 @@
 
   export let account: string;
 
+  const { account } = $props();
+  
+
   let todos: Todo[] = $state([]);
   let newTodoText = $state('');
   let isLoading = $state(false);
