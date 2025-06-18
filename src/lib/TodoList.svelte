@@ -2,7 +2,6 @@
   import { getTodos, createTodo, toggleTodo, type Todo } from './algorand';
   import { onMount } from 'svelte';
 
-  export let account: string;
 
   const { account } = $props();
   
