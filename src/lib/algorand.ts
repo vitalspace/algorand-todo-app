@@ -6,7 +6,13 @@ const algodToken = '';
 const algodServer = 'https://testnet-api.algonode.cloud';
 const algodPort = 443;
 
+// Configuración para Indexer
+const indexerToken = '';
+const indexerServer = 'https://testnet-idx.algonode.cloud';
+const indexerPort = 443;
+
 export const algodClient = new algosdk.Algodv2(algodToken, algodServer, algodPort);
+export const indexerClient = new algosdk.Indexer(indexerToken, indexerServer, indexerPort);
 
 // Inicializar Pera Wallet
 export const peraWallet = new PeraWalletConnect({
@@ -88,8 +94,8 @@ export async function getTodos(account: string): Promise<Todo[]> {
     const accountInfo = await algodClient.accountInformation(account).do();
     const todos: Todo[] = [];
     
-    // Obtener las últimas 100 transacciones
-    const txns = await algodClient.searchForTransactions()
+    // Obtener las últimas 100 transacciones usando el Indexer
+    const txns = await indexerClient.searchForTransactions()
       .address(account)
       .addressRole('sender')
       .limit(100)
