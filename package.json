@@ -12,7 +12,9 @@
   "dependencies": {
     "@algorandfoundation/algokit-utils": "^9.1.0",
     "algosdk": "^3.3.1",
-    "@perawallet/connect": "^1.4.2"
+    "@perawallet/connect": "^1.4.2",
+    "buffer": "^6.0.3",
+    "process": "^0.11.10"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
