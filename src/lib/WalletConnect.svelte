@@ -1,6 +1,6 @@
 <script lang="ts">
   import { connectWallet, disconnectWallet } from './algorand';
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
 
   const dispatch = createEventDispatcher();
 
@@ -8,6 +8,22 @@
   export let account = '';
 
   let isConnecting = false;
+
+  onMount(async () => {
+    try {
+      // Check if there's an existing session and reconnect
+      const accounts = await connectWallet();
+      if (accounts.length > 0) {
+        account = accounts[0];
+        isConnected = true;
+        dispatch('connect', { account });
+      }
+    } catch (error) {
+      // If reconnection fails, ensure we're in disconnected state
+      isConnected = false;
+      account = '';
+    }
+  });
 
   async function handleConnect() {
     if (isConnected) {
