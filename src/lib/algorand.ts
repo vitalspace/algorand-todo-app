@@ -27,10 +27,45 @@ export interface Todo {
   timestamp: number;
 }
 
+// Función para verificar si hay una sesión activa
+export function getConnectedAccount(): string | null {
+  try {
+    // Check localStorage for persisted account
+    const savedAccount = localStorage.getItem('peraWallet.account');
+    if (savedAccount) {
+      return savedAccount;
+    }
+    
+    // Check if Pera Wallet has active accounts
+    const accounts = peraWallet.connector?.accounts;
+    if (accounts && accounts.length > 0) {
+      return accounts[0];
+    }
+    
+    return null;
+  } catch (error) {
+    console.log('No active session found');
+    return null;
+  }
+}
+
 // Función para conectar wallet
 export async function connectWallet(): Promise<string[]> {
   try {
+    // First check if already connected
+    const existingAccount = getConnectedAccount();
+    if (existingAccount && peraWallet.connector?.accounts?.length > 0) {
+      return [existingAccount];
+    }
+
+    // If not connected, create new connection
     const accounts = await peraWallet.connect();
+    
+    // Save to localStorage for persistence
+    if (accounts.length > 0) {
+      localStorage.setItem('peraWallet.account', accounts[0]);
+    }
+    
     return accounts;
   } catch (error) {
     console.error('Error connecting wallet:', error);
@@ -38,9 +73,37 @@ export async function connectWallet(): Promise<string[]> {
   }
 }
 
+// Función para reconectar automáticamente
+export async function reconnectWallet(): Promise<string | null> {
+  try {
+    const savedAccount = localStorage.getItem('peraWallet.account');
+    if (!savedAccount) {
+      return null;
+    }
+
+    // Try to reconnect to existing session
+    await peraWallet.reconnectSession();
+    
+    // Verify the connection is still valid
+    const accounts = peraWallet.connector?.accounts;
+    if (accounts && accounts.includes(savedAccount)) {
+      return savedAccount;
+    } else {
+      // Session is invalid, clear storage
+      localStorage.removeItem('peraWallet.account');
+      return null;
+    }
+  } catch (error) {
+    // If reconnection fails, clear storage
+    localStorage.removeItem('peraWallet.account');
+    return null;
+  }
+}
+
 // Función para desconectar wallet
 export function disconnectWallet(): void {
   peraWallet.disconnect();
+  localStorage.removeItem('peraWallet.account');
 }
 
 // Función para crear una nueva tarea en la blockchain
@@ -91,7 +154,6 @@ export async function createTodo(account: string, todoText: string): Promise<str
 // Función para obtener todas las tareas de un usuario
 export async function getTodos(account: string): Promise<Todo[]> {
   try {
-    const accountInfo = await algodClient.accountInformation(account).do();
     const todos: Todo[] = [];
     
     // Obtener las últimas 100 transacciones usando el Indexer

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { connectWallet, disconnectWallet, peraWallet } from './algorand';
+  import { connectWallet, disconnectWallet, reconnectWallet, getConnectedAccount } from './algorand';
   import { createEventDispatcher, onMount } from 'svelte';
 
   const dispatch = createEventDispatcher();
@@ -11,18 +11,25 @@
 
   onMount(async () => {
     try {
-      // Check if Pera Wallet already has an active session
-      const connectedAccounts = peraWallet.connector?.accounts || [];
+      // Try to reconnect to existing session
+      const reconnectedAccount = await reconnectWallet();
       
-      if (connectedAccounts.length > 0) {
-        // Session exists, use the existing connection
-        account = connectedAccounts[0];
+      if (reconnectedAccount) {
+        account = reconnectedAccount;
         isConnected = true;
         dispatch('connect', { account });
+      } else {
+        // Check for saved account in localStorage as fallback
+        const savedAccount = getConnectedAccount();
+        if (savedAccount) {
+          account = savedAccount;
+          isConnected = true;
+          dispatch('connect', { account });
+        }
       }
     } catch (error) {
-      console.log('No existing session found');
-      // If no session exists, ensure we're in disconnected state
+      console.log('No existing session to reconnect');
+      // Ensure we're in disconnected state
       isConnected = false;
       account = '';
     }
@@ -38,22 +45,11 @@
       try {
         isConnecting = true;
         
-        // Check if already connected before attempting to connect
-        const existingAccounts = peraWallet.connector?.accounts || [];
-        
-        if (existingAccounts.length > 0) {
-          // Use existing connection
-          account = existingAccounts[0];
+        const accounts = await connectWallet();
+        if (accounts.length > 0) {
+          account = accounts[0];
           isConnected = true;
           dispatch('connect', { account });
-        } else {
-          // Create new connection
-          const accounts = await connectWallet();
-          if (accounts.length > 0) {
-            account = accounts[0];
-            isConnected = true;
-            dispatch('connect', { account });
-          }
         }
       } catch (error) {
         console.error('Failed to connect wallet:', error);
