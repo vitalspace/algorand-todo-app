@@ -25,6 +25,7 @@ export interface Todo {
   completed: boolean;
   creator: string;
   timestamp: number;
+  txId?: string; // Agregamos el ID de transacción para referencia
 }
 
 // Función para verificar si hay una sesión activa
@@ -178,7 +179,8 @@ export async function getTodos(account: string): Promise<Todo[]> {
               text: todoData.text,
               completed: todoData.completed || false,
               creator: account,
-              timestamp: todoData.timestamp || 0
+              timestamp: todoData.timestamp || 0,
+              txId: txn.id
             });
           }
         } catch (e) {
@@ -192,6 +194,132 @@ export async function getTodos(account: string): Promise<Todo[]> {
     return todos.sort((a, b) => b.timestamp - a.timestamp);
   } catch (error) {
     console.error('Error fetching todos:', error);
+    return [];
+  }
+}
+
+// Función para obtener una tarea específica por texto
+export async function getTodoByText(account: string, todoText: string): Promise<Todo | null> {
+  try {
+    // Obtener todas las transacciones del usuario
+    const txns = await indexerClient.searchForTransactions()
+      .address(account)
+      .addressRole('sender')
+      .limit(100)
+      .do();
+
+    // Buscar la tarea específica
+    for (const txn of txns.transactions) {
+      if (txn.note) {
+        try {
+          const noteBytes = Buffer.from(txn.note, 'base64');
+          const noteString = noteBytes.toString('utf-8');
+          const todoData = JSON.parse(noteString);
+          
+          if (todoData.type === 'todo' && todoData.text === todoText) {
+            return {
+              id: 1, // Se podría mejorar con un ID más específico
+              text: todoData.text,
+              completed: todoData.completed || false,
+              creator: account,
+              timestamp: todoData.timestamp || 0,
+              txId: txn.id
+            };
+          }
+        } catch (e) {
+          // Ignorar notas que no son JSON válido
+          continue;
+        }
+      }
+    }
+    
+    return null; // No se encontró la tarea
+  } catch (error) {
+    console.error('Error fetching todo by text:', error);
+    return null;
+  }
+}
+
+// Función para obtener una tarea específica por ID de transacción
+export async function getTodoByTxId(txId: string): Promise<Todo | null> {
+  try {
+    // Obtener la transacción específica
+    const txn = await indexerClient.lookupTransactionByID(txId).do();
+    
+    if (txn.transaction && txn.transaction.note) {
+      try {
+        const noteBytes = Buffer.from(txn.transaction.note, 'base64');
+        const noteString = noteBytes.toString('utf-8');
+        const todoData = JSON.parse(noteString);
+        
+        if (todoData.type === 'todo') {
+          return {
+            id: 1, // Se podría mejorar con un ID más específico
+            text: todoData.text,
+            completed: todoData.completed || false,
+            creator: txn.transaction.sender,
+            timestamp: todoData.timestamp || 0,
+            txId: txn.transaction.id
+          };
+        }
+      } catch (e) {
+        console.error('Error parsing transaction note:', e);
+        return null;
+      }
+    }
+    
+    return null; // No es una tarea válida
+  } catch (error) {
+    console.error('Error fetching todo by transaction ID:', error);
+    return null;
+  }
+}
+
+// Función para obtener el historial completo de una tarea (incluyendo actualizaciones)
+export async function getTodoHistory(account: string, todoText: string): Promise<Todo[]> {
+  try {
+    const todoHistory: Todo[] = [];
+    
+    // Obtener todas las transacciones del usuario
+    const txns = await indexerClient.searchForTransactions()
+      .address(account)
+      .addressRole('sender')
+      .limit(100)
+      .do();
+
+    let todoId = 1;
+    
+    // Buscar todas las transacciones relacionadas con esta tarea
+    for (const txn of txns.transactions) {
+      if (txn.note) {
+        try {
+          const noteBytes = Buffer.from(txn.note, 'base64');
+          const noteString = noteBytes.toString('utf-8');
+          const todoData = JSON.parse(noteString);
+          
+          // Incluir tanto creación como actualizaciones de la tarea
+          if ((todoData.type === 'todo' || todoData.type === 'todo_update') && 
+              todoData.text === todoText) {
+            todoHistory.push({
+              id: todoId++,
+              text: todoData.text,
+              completed: todoData.completed || false,
+              creator: account,
+              timestamp: todoData.timestamp || 0,
+              txId: txn.id
+            });
+          }
+        } catch (e) {
+          // Ignorar notas que no son JSON válido
+          continue;
+        }
+      }
+    }
+    
+    // Ordenar por timestamp descendente (más recientes primero)
+    return todoHistory.sort((a, b) => b.timestamp - a.timestamp);
+  } catch (error) {
+    console.error('Error fetching todo history:', error);
     return [];
   }
 }
